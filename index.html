@@ -403,7 +403,7 @@
     }
 
     /* Highlights */
-    function escReg(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }
+    function escReg(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
     function highlightText(text, query){ if (!query) return text; const r=new RegExp(`(${escReg(query)})`,'gi'); return text.replace(r,'<mark>$1</mark>'); }
     function clearHighlights(root){ root.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)); }
 
@@ -943,7 +943,7 @@
         }catch{}
       }
 
-      let dragging = null;
+      let dragging = None;
 
       ths.forEach(th=>{
         const handle = th.querySelector('.col-resizer');
