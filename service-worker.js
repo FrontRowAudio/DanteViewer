@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dante-viewer-cache-v1.000001';
+const CACHE_NAME = 'dante-viewer-cache-v1.000002';
 const APP_SHELL = [
   './',
   './index.html',
