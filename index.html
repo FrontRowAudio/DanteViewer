@@ -192,11 +192,15 @@
           <option value="dark">Dark</option>
         </select>
         <button id="compactBtn" class="btn small">🧩 Compact</button>
+
         <label class="chk" title="Reduce color fills in print">
           <input type="checkbox" id="inkSaver"> Print: ink saver
         </label>
         <button id="exportCsv" class="btn small" title="Export visible rows">📤 Export CSV</button>
         <button id="printBtn" class="btn small" title="Print or save as PDF">🖨️ Print/PDF</button>
+
+        <!-- NEW: Reset widths -->
+        <button id="resetColWidths" class="btn small" title="Clear saved column sizes">🔄 Reset widths</button>
       </div>
     </header>
 
@@ -292,6 +296,7 @@
     const showChNo = document.getElementById('showChNo');
     const allowWrap = document.getElementById('allowWrap');
     const inkSaver = document.getElementById('inkSaver');
+    const resetColWidthsBtn = document.getElementById('resetColWidths');
 
     let hideEmptyRX = false;
     let hideDevices = false;
@@ -302,6 +307,8 @@
     let allRxExpanded = true;
     let allVendorsExpanded = true;
     let allTxExpanded = true;
+
+    const COLS_STORAGE_KEY = 'dante_colwidths_v2';
 
     /* Theme */
     function applyTheme(mode){
@@ -331,7 +338,7 @@
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         if (toolbar.classList.contains('collapsed')) setToolbarCollapsed(false);
-        if (searchInput) searchInput.focus();
+        searchInput?.focus();
       }
     });
 
@@ -353,7 +360,7 @@
     }
     printBtn.addEventListener('click', () => { updatePrintBanner(); window.print(); });
     if ('onbeforeprint' in window){ window.addEventListener('beforeprint', updatePrintBanner); }
-    if (inkSaver) inkSaver.addEventListener('change', ()=> document.body.classList.toggle('ink-saver', !!inkSaver.checked));
+    inkSaver?.addEventListener('change', ()=> document.body.classList.toggle('ink-saver', !!inkSaver.checked));
 
     /* Search mode segmented control */
     searchModeSeg.addEventListener('click', (e)=>{
@@ -364,7 +371,7 @@
       applyFilters();
     });
 
-    /* Vendor colors (dynamic fallback for unknowns) */
+    /* Vendor colors */
     const dynamicVendorMap = JSON.parse(localStorage.getItem('dante_vendor_dynmap') || '{}');
     const dynamicPalette = ['#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#f97316','#22c55e','#e11d48','#06b6d4','#84cc16','#a855f7','#f43f5e','#eab308','#3b82f6'];
     function getDynamicColorFor(vendor){
@@ -394,19 +401,9 @@
     }
 
     /* Highlights */
-    function escReg(s){
-      return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-    function highlightText(text, query){
-      if (!query) return text;
-      const r=new RegExp('('+escReg(query)+')','gi');
-      return text.replace(r,'<mark>$1</mark>');
-    }
-    function clearHighlights(root){
-      root.querySelectorAll('mark').forEach(m =>
-        m.replaceWith(document.createTextNode(m.textContent))
-      );
-    }
+    function escReg(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function highlightText(text, query){ if (!query) return text; const r=new RegExp('('+escReg(query)+')','gi'); return text.replace(r,'<mark>$1</mark>'); }
+    function clearHighlights(root){ root.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)); }
 
     /* Snapshot hash (notes per file) */
     function djb2(str){let h=5381;for(let i=0;i<str.length;i++){h=((h<<5)+h)+str.charCodeAt(i);}return (h>>>0).toString(36);}
@@ -543,8 +540,9 @@
       initVendorHeaders();
       initNotes();
       initSorting();
-      makeColumnsResizable();
+      makeColumnsResizable();           // attach resizers
       afterRenderUiSync();
+      updateResizeBehaviorForScreen();  // maybe disable on very narrow screens
     }
 
     /* Expand/Collapse toggles */
@@ -629,7 +627,7 @@
       });
     }
 
-    /* Filtering helpers */
+    /* Filtering */
     function matchesMode(text, q){
       if (!q) return true;
       const t = text.toLowerCase(), s = q.toLowerCase();
@@ -738,7 +736,7 @@
     includeDeviceInMeta.addEventListener('change', applyFilters);
     showOnlyErrorsChk.addEventListener('change', applyFilters);
 
-    /* Sorting with indicators & multi-sort (Shift+click) */
+    /* Sorting */
     function initSorting(){
       const ths = document.querySelectorAll('thead th');
       ths.forEach(th => {
@@ -790,14 +788,15 @@
     }
 
     /* TOUCH-FRIENDLY column resize via Pointer Events */
+    let resizeEnhancerAttached = false;
     function makeColumnsResizable(){
+      if (resizeEnhancerAttached) return; // avoid duplicate listeners
       const table = document.getElementById('dataTable');
       const ths   = table.querySelectorAll('thead th');
       const cols  = table.querySelectorAll('colgroup col');
 
       const MIN_PX = 120;
       const LINKED = new Map([ ['tx','rx'], ['rx','tx'] ]);
-      const STORAGE_KEY = 'dante_colwidths_v2';
 
       const thByKey = {}; const colByKey = {};
       ths.forEach(th => { if (th.dataset.col) thByKey[th.dataset.col] = th; });
@@ -817,11 +816,11 @@
           const th = thByKey[k]; if (!th) return;
           map[k] = Math.round(currentWidthPx(th));
         });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+        localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(map));
       }
       function loadWidths(){
         try{
-          const map = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+          const map = JSON.parse(localStorage.getItem(COLS_STORAGE_KEY)||'{}');
           Object.entries(map).forEach(([k,px])=>{
             if (!px) return;
             setColWidth(k, px);
@@ -834,6 +833,7 @@
       let drag = null; // { key, startX, startW }
 
       function onPointerDown(e, th){
+        if (e.currentTarget?.dataset?.disabled === '1') return; // disabled on narrow screens
         const key = th.dataset.col; if (!key) return;
         e.target.setPointerCapture?.(e.pointerId);
         drag = { key, startX: e.clientX, startW: currentWidthPx(th) };
@@ -875,7 +875,7 @@
         let lastTap = 0;
         handle.addEventListener('pointerup', ()=>{
           const now = Date.now();
-          if (now - lastTap < 350) {
+          if (now - lastTap < 350 && handle.dataset.disabled !== '1') {
             const w = th.scrollWidth + 24;
             setColWidth(th.dataset.col, w);
             const mate = LINKED.get(th.dataset.col);
@@ -887,7 +887,25 @@
       });
 
       loadWidths();
+      resizeEnhancerAttached = true;
     }
+
+    // Narrow-screen behavior: disable handles by flag
+    function disableColumnResizing(){
+      document.querySelectorAll('thead th .col-resizer').forEach(h => h.dataset.disabled = '1');
+    }
+    function enableColumnResizing(){
+      document.querySelectorAll('thead th .col-resizer').forEach(h => delete h.dataset.disabled);
+    }
+    function updateResizeBehaviorForScreen(){
+      const narrow = window.matchMedia('(max-width: 480px)').matches;
+      if (narrow) disableColumnResizing();
+      else {
+        enableColumnResizing();
+        makeColumnsResizable(); // ensure bound once
+      }
+    }
+    window.addEventListener('resize', updateResizeBehaviorForScreen);
 
     /* Print width fitter: px -> % during print, then restore */
     (function initPrintWidthFit(){
@@ -946,6 +964,86 @@
     deviceSearch.addEventListener('input', applyFiltersAndSync);
     searchInput.addEventListener('input', applyFiltersAndSync);
     includeDeviceInMeta.addEventListener('change', applyFiltersAndSync);
+
+    /* CSV export */
+    function csvEscape(s){ const cleaned = s.replace(/\r?\n+/g,' ').replace(/\s+/g,' ').trim(); return '"' + cleaned.replace(/"/g,'""') + '"'; }
+    function stripLeadingChNo(s){ return s.replace(/^\s*\d+\.\s*/, ''); }
+    function visibleTextFromList(cell, {includeCollapsed=false, row} = {}){
+      const list = cell?.querySelector('ul'); if (!list) return [];
+      const collapsed = row && row.classList.contains('rx-collapsed');
+      const lis = Array.from(list.querySelectorAll('li')).filter(li => {
+        if (getComputedStyle(li).display === 'none') return false;
+        if (!includeCollapsed && collapsed && (cell.classList.contains('rxCell') || cell.classList.contains('connectedCell'))) return false;
+        return li.offsetParent !== null;
+      });
+      return lis.map(li => li.textContent.trim());
+    }
+    function exportVisibleToCSV(){
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.classList.contains('vendor-header') && r.offsetParent !== null && getComputedStyle(r).display !== 'none');
+      const header = ['Device','Manufacturer','Model','TX Channel','RX Channel','Connected Source'];
+      const lines = [header.map(csvEscape).join(',')];
+      rows.forEach(row => {
+        const dev = (row.querySelector('.devName')?.textContent || '').replace(/^[▾▸]\s*/,'').trim();
+        const manuChip = row.querySelector('.manu .chip');
+        const manu = manuChip?.getAttribute('data-text') || manuChip?.textContent.trim() || '';
+        const model = row.querySelector('.model')?.textContent.trim() || '';
+
+        const txArr = visibleTextFromList(row.querySelector('.txCell'), {row});
+        const rxArr = visibleTextFromList(row.querySelector('.rxCell'), {includeCollapsed: exportIncludeCollapsed.checked, row}).map(t => t.replace(/\s*$/, ''));
+        const connArr = visibleTextFromList(row.querySelector('.connectedCell'), {includeCollapsed: exportIncludeCollapsed.checked, row});
+
+        const hideNumbers = document.body.classList.contains('hide-chno');
+        const txOut = hideNumbers ? txArr.map(stripLeadingChNo) : txArr;
+        const rxOut = hideNumbers ? rxArr.map(stripLeadingChNo) : rxArr;
+
+        const maxLen = Math.max(txOut.length, rxOut.length, 1);
+        for (let i=0;i<maxLen;i++){
+          lines.push([dev, manu, model, txOut[i]||'', rxOut[i]||'', connArr[i]||''].map(csvEscape).join(','));
+        }
+      });
+      const csv = '\uFEFF' + lines.join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g,'-');
+      a.href = url; a.download = `dante_snapshot_export_${ts}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+    exportBtn.addEventListener('click', exportVisibleToCSV);
+
+    /* Pair height sync for wrap mode */
+    function syncPairHeightsRow(row){
+      const wrapOn = document.body.classList.contains('line-wrap');
+      const rxLis = row.querySelectorAll('.rxCell .rxNamesList li');
+      const cnLis = row.querySelectorAll('.connectedCell .connectedList li');
+      const len = Math.max(rxLis.length, cnLis.length);
+      for (let i=0;i<len;i++){
+        const rx = rxLis[i], cn = cnLis[i]; if (!rx || !cn) continue;
+        rx.style.minHeight = ''; cn.style.minHeight = '';
+        if (!wrapOn) continue;
+        if (rx.style.display==='none' || cn.style.display==='none') continue;
+        const rh = rx.getBoundingClientRect().height, ch = cn.getBoundingClientRect().height;
+        const h = Math.max(rh, ch, 24);
+        rx.style.minHeight = h + 'px'; cn.style.minHeight = h + 'px';
+      }
+    }
+    function syncAllPairHeights(){
+      if (!document.body.classList.contains('line-wrap')){
+        tbody.querySelectorAll('.rxNamesList li, .connectedList li').forEach(li => li.style.minHeight = '');
+        return;
+      }
+      Array.from(tbody.querySelectorAll('tr')).forEach(r => { if(!r.classList.contains('vendor-header') && r.style.display !== 'none') syncPairHeightsRow(r); });
+    }
+    let resizeTO = null;
+    window.addEventListener('resize', ()=>{ if (resizeTO) cancelAnimationFrame(resizeTO); resizeTO = requestAnimationFrame(syncAllPairHeights); });
+
+    /* Reset column widths */
+    function clearColumnWidths(){
+      try { localStorage.removeItem(COLS_STORAGE_KEY); } catch {}
+      document.querySelectorAll('colgroup col').forEach(c => c.style.width = '');
+      requestAnimationFrame(()=>{ try{ syncAllPairHeights(); }catch{} });
+    }
+    resetColWidthsBtn?.addEventListener('click', clearColumnWidths);
   </script>
 
   <script>
