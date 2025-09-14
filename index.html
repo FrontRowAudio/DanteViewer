@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8" />
   <title>Dante Snapshot Viewer</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
       --bg:#f6f7fb; --panel:#ffffff; --panel-2:#f1f3f8; --text:#1f2330; --muted:#6b7280; --border:#e5e7eb;
@@ -15,6 +14,7 @@
       --shure:#00a651; --shure-bg:#e7f8ef; --tsl:#008080; --tsl-bg:#e6f7f7;
       --rts:#0091ea; --rts-bg:#e6f5ff; --audinate:#c2185b; --audinate-bg:#fde9f1; --default:#9ca3af; --default-bg:#f4f4f4;
 
+      /* Initial channel width for TX & RX; resizer/colgroup will override */
       --chan-col-width: 520px;
     }
     @media (prefers-color-scheme: dark){
@@ -45,6 +45,7 @@
     .print-banner{ display:none; align-items:center; justify-content:space-between; gap:12px; margin:8px 0 0; font-size:12px; color:var(--muted);
       border-bottom:1px solid var(--border); padding-bottom:6px; }
 
+    /* Collapsible toolbar */
     .toolbar{ position:sticky; top:0; z-index:5; padding:12px; border:1px solid var(--border); background:var(--panel); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; transition:max-height .25s ease, padding .2s ease; }
     .toolbar.collapsed{ max-height:44px; padding:6px 12px; }
     .toolbar-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
@@ -80,10 +81,13 @@
     td.sticky, th.sticky{ position:sticky; left:0; z-index:2; background:inherit; box-shadow:6px 0 0 0 var(--panel); }
     tbody tr:hover td.sticky{ background:var(--hover); }
 
+    /* colgroup defaults for TX/RX */
     col[data-col="tx"], col[data-col="rx"]{ width: var(--chan-col-width); }
 
+    /* Lists – no bullets */
     ul{ margin:0; padding-left:0; list-style:none; }
 
+    /* Channel list items */
     .txList li, .rxNamesList li, .connectedList li{
       display:flex; align-items:center; min-height:24px; border-bottom:1px dashed var(--border);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:6px;
@@ -92,6 +96,7 @@
       white-space:normal; text-overflow:clip;
     }
 
+    /* Channel numbers bold */
     .chno{ display:inline-block; min-width:2ch; margin-right:6px; font-weight:700; font-variant-numeric:tabular-nums; }
     body.hide-chno .chno{ display:none; }
 
@@ -119,42 +124,58 @@
 
     mark{ background:var(--mark-bg); padding:0 .15em; border-radius:3px; }
 
+    /* Compact view tweaks */
     body.compact thead th{ padding:8px; font-size:11px; }
     body.compact tbody td{ padding:6px 8px; }
     body.compact .input, body.compact input[type=file]{ padding:8px 10px; }
     body.compact .btn{ padding:8px 10px; }
 
+    /* RX collapse */
     .rx-collapsed .rxCell .rxList{ display:none; }
     .rx-collapsed .connectedCell .connectedList{ display:none; }
     .chev{ cursor:pointer; user-select:none; font-weight:700; margin-right:8px; }
 
+    /* TX collapse (global) */
     .tx-collapsed .txCell .txList{ display:none; }
 
+    /* Vendor headers */
     .vendor-header td{ position:sticky; top:42px; background:var(--panel); z-index:2; font-weight:800; text-transform:uppercase; color:var(--muted); border-bottom:2px solid var(--border); }
     .vh-btn{ cursor:pointer; border:none; background:transparent; font-weight:800; margin-right:8px; }
     .vh-count{ font-size:12px; color:var(--muted); margin-left:8px; }
 
+    /* Notes popover */
     .note-btn{ margin-left:8px; cursor:pointer; border:1px solid var(--border); background:var(--panel-2); border-radius:6px; padding:2px 6px; font-size:12px; }
     .note{ display:none; margin-top:6px; }
     .note textarea{ width:100%; min-height:60px; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--text); }
 
+    /* Column resize handle */
     th{ position:relative; }
-    th .col-resizer{ position:absolute; right:0; top:0; bottom:0; width:8px; cursor:col-resize; user-select:none; }
+    th .col-resizer{
+      position:absolute; right:0; top:0; bottom:0; width:8px; cursor:col-resize; user-select:none;
+    }
     th .col-resizer:hover{ background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
+    /* PRINT PACK */
     @media print{
       @page { size: landscape; margin: 12mm; }
       html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       thead { display: table-header-group; }
       tfoot { display: table-footer-group; }
       .rxCell .rxList, .connectedCell .connectedList, .txList { display:block !important; }
+
+      /* Ensure table fits page width and wraps */
       .table-wrap{ overflow: visible !important; }
       table{ min-width:0 !important; width:100% !important; table-layout:auto !important; }
       col{ width:auto !important; }
       th, td{ word-break:break-word; overflow:visible !important; }
+
+      /* Sticky can clip in print—disable it */
       thead th, th.sticky, td.sticky{ position:static !important; box-shadow:none !important; }
+
+      /* Slightly denser for more columns */
       thead th{ padding:8px 8px !important; font-size:11px !important; }
       tbody td{ padding:6px 8px !important; font-size:11px !important; }
+
       tbody tr { page-break-inside: avoid; break-inside: avoid; }
       header, .toolbar { display:none !important; }
       .print-banner { display:flex !important; }
@@ -166,13 +187,6 @@
       }
     }
   </style>
-
-  <!-- PWA bits -->
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png"/>
-  <link rel="manifest" href="manifest.webmanifest"/>
-  <meta name="theme-color" content="#000000"/>
 </head>
 <body>
   <div class="wrap">
@@ -188,6 +202,8 @@
           <option value="dark">Dark</option>
         </select>
         <button id="compactBtn" class="btn small">🧩 Compact</button>
+
+        <!-- Moved here: Ink saver + Export CSV + Print -->
         <label class="chk" title="Reduce color fills in print">
           <input type="checkbox" id="inkSaver"> Print: ink saver
         </label>
@@ -196,6 +212,7 @@
       </div>
     </header>
 
+    <!-- Shown only in print -->
     <div class="print-banner">
       <div id="pb-left">Dante Snapshot Viewer</div>
       <div id="pb-right"></div>
@@ -226,15 +243,24 @@
       </div>
 
       <div class="toolbar-row">
+        <!-- NEW: TX global toggle -->
         <button id="toggleTXAll" class="btn">▾ Expand all TX</button>
+
         <button id="toggleRX" class="btn">🎧 Hide RX with No Subscriptions</button>
         <button id="toggleDevices" class="btn">🗂️ Hide Devices with No Subscribed RXs</button>
+
+        <!-- RX expand/collapse single toggle -->
         <button id="toggleAllRX" class="btn">▾ Expand all RX</button>
+
         <label class="chk"><input type="checkbox" id="exportIncludeCollapsed"> Include collapsed RX in export</label>
+
+        <!-- (Ink saver + Export CSV moved to header) -->
       </div>
 
       <div class="toolbar-row">
+        <!-- Vendor expand/collapse single toggle -->
         <button id="toggleAllVendors" class="btn small">▾ Expand all Vendors</button>
+
         <label class="chk"><input type="checkbox" id="showOnlyErrors"> Show only RX errors</label>
         <label class="chk"><input type="checkbox" id="showChNo" checked> Show channel numbers</label>
         <label class="chk"><input type="checkbox" id="allowWrap"> Allow line wrap (keep alignment)</label>
@@ -243,6 +269,7 @@
 
     <div class="table-wrap">
       <table id="dataTable">
+        <!-- colgroup for reliable column sizing/resizing -->
         <colgroup>
           <col data-col="device">
           <col data-col="manufacturer">
@@ -292,14 +319,14 @@
     let hideEmptyRX = false;
     let hideDevices = false;
     let snapshotHash = 'default';
-    let searchMode = 'contains';
-    let sortState = [];
+    let searchMode = 'contains'; // contains | whole | starts
+    let sortState = []; // [{col:'manufacturer', dir:1}, ...]
     let loadedFileName = '';
     let allRxExpanded = true;
     let allVendorsExpanded = true;
     let allTxExpanded = true;
 
-    /* Theme */
+    /* Theme (3-state) */
     function applyTheme(mode){
       document.body.classList.remove('light','dark');
       if (mode === 'light' || mode === 'dark') document.body.classList.add(mode);
@@ -327,7 +354,7 @@
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         if (toolbar.classList.contains('collapsed')) setToolbarCollapsed(false);
-        if (searchInput) searchInput.focus();
+        searchInput?.focus();
       }
     });
 
@@ -349,7 +376,7 @@
     }
     printBtn.addEventListener('click', () => { updatePrintBanner(); window.print(); });
     if ('onbeforeprint' in window){ window.addEventListener('beforeprint', updatePrintBanner); }
-    if (inkSaver) inkSaver.addEventListener('change', ()=> document.body.classList.toggle('ink-saver', !!inkSaver.checked));
+    inkSaver?.addEventListener('change', ()=> document.body.classList.toggle('ink-saver', !!inkSaver.checked));
 
     /* Search mode segmented control */
     searchModeSeg.addEventListener('click', (e)=>{
@@ -390,19 +417,9 @@
     }
 
     /* Highlights */
-    function escReg(s){
-      return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-    function highlightText(text, query){
-      if (!query) return text;
-      const r=new RegExp('('+escReg(query)+')','gi');
-      return text.replace(r,'<mark>$1</mark>');
-    }
-    function clearHighlights(root){
-      root.querySelectorAll('mark').forEach(m =>
-        m.replaceWith(document.createTextNode(m.textContent))
-      );
-    }
+    function escReg(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function highlightText(text, query){ if (!query) return text; const r=new RegExp(`(${escReg(query)})`,'gi'); return text.replace(r,'<mark>$1</mark>'); }
+    function clearHighlights(root){ root.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)); }
 
     /* Snapshot hash (notes per file) */
     function djb2(str){let h=5381;for(let i=0;i<str.length;i++){h=((h<<5)+h)+str.charCodeAt(i);}return (h>>>0).toString(36);}
@@ -539,7 +556,7 @@
       initVendorHeaders();
       initNotes();
       initSorting();
-      makeColumnsResizable();
+      makeColumnsResizable(); // ensure resizer binds after render
       afterRenderUiSync();
     }
 
@@ -551,6 +568,7 @@
       row.dataset.rxCollapsed = collapsed ? '1' : '0';
       chev.textContent = collapsed ? '▸' : '▾';
     }
+    function isRxCollapsed(row){ return row.classList.contains('rx-collapsed'); }
     function initChevronsForAllRows(){ tbody.querySelectorAll('tr').forEach(r => { if (!r.classList.contains('vendor-header')) setRxCollapsed(r, false); }); }
 
     function setAllRX(expanded){
@@ -739,7 +757,7 @@
       const ths = document.querySelectorAll('thead th');
       ths.forEach(th => {
         th.addEventListener('click', (e)=>{
-          if (e.target.closest('.col-resizer')) return;
+          if (e.target.closest('.col-resizer')) return; // ignore resizer
           const col = th.dataset.col; if (!col) return;
           const existing = sortState.find(s => s.col === col);
           const shift = e.shiftKey;
@@ -785,7 +803,120 @@
       });
     }
 
-    /* Column resize via colgroup (TX & RX linked, persisted) */
+    /* Toggles */
+    toggleRXButton.addEventListener('click', () => {
+      hideEmptyRX = !hideEmptyRX;
+      toggleRXButton.classList.toggle('primary', hideEmptyRX);
+      toggleRXButton.textContent = hideEmptyRX ? "🎧 Show RX with No Subscriptions" : "🎧 Hide RX with No Subscriptions";
+      applyFilters();
+    });
+    toggleDevicesButton.addEventListener('click', () => {
+      hideDevices = !hideDevices;
+      toggleDevicesButton.classList.toggle('primary', hideDevices);
+      toggleDevicesButton.textContent = hideDevices ? "🗂️ Show Devices with No Subscribed RXs" : "🗂️ Hide Devices with No Subscribed RXs";
+      applyFilters();
+    });
+
+    /* Channel numbers toggle (persisted) */
+    (function initChNo(){
+      const saved = localStorage.getItem('dante_show_chno');
+      const show = saved === null ? true : saved === '1';
+      document.body.classList.toggle('hide-chno', !show);
+      if (showChNo) showChNo.checked = show;
+    })();
+    showChNo?.addEventListener('change', ()=>{
+      const show = !!showChNo.checked;
+      document.body.classList.toggle('hide-chno', !show);
+      localStorage.setItem('dante_show_chno', show ? '1' : '0');
+      syncAllPairHeights();
+    });
+
+    /* Line wrap toggle (persisted) */
+    (function initWrap(){
+      const saved = localStorage.getItem('dante_allow_wrap') === '1';
+      document.body.classList.toggle('line-wrap', saved);
+      if (allowWrap) allowWrap.checked = saved;
+    })();
+    allowWrap?.addEventListener('change', ()=>{
+      const on = !!allowWrap.checked;
+      document.body.classList.toggle('line-wrap', on);
+      localStorage.setItem('dante_allow_wrap', on ? '1' : '0');
+      syncAllPairHeights();
+    });
+
+    /* CSV export */
+    function csvEscape(s){ const cleaned = s.replace(/\r?\n+/g,' ').replace(/\s+/g,' ').trim(); return `"${cleaned.replace(/"/g,'""')}"`; }
+    function stripLeadingChNo(s){ return s.replace(/^\s*\d+\.\s*/, ''); }
+    function visibleTextFromList(cell, {includeCollapsed=false, row} = {}){
+      const list = cell?.querySelector('ul'); if (!list) return [];
+      const collapsed = row && row.classList.contains('rx-collapsed');
+      const lis = Array.from(list.querySelectorAll('li')).filter(li => {
+        if (getComputedStyle(li).display === 'none') return false;
+        if (!includeCollapsed && collapsed && (cell.classList.contains('rxCell') || cell.classList.contains('connectedCell'))) return false;
+        return li.offsetParent !== null;
+      });
+      return lis.map(li => li.textContent.trim());
+    }
+    function exportVisibleToCSV(){
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.classList.contains('vendor-header') && r.offsetParent !== null && getComputedStyle(r).display !== 'none');
+      const header = ['Device','Manufacturer','Model','TX Channel','RX Channel','Connected Source'];
+      const lines = [header.map(csvEscape).join(',')];
+      rows.forEach(row => {
+        const dev = (row.querySelector('.devName')?.textContent || '').replace(/^[▾▸]\s*/,'').trim();
+        const manuChip = row.querySelector('.manu .chip');
+        const manu = manuChip?.getAttribute('data-text') || manuChip?.textContent.trim() || '';
+        const model = row.querySelector('.model')?.textContent.trim() || '';
+
+        const txArr = visibleTextFromList(row.querySelector('.txCell'), {row});
+        const rxArr = visibleTextFromList(row.querySelector('.rxCell'), {includeCollapsed: exportIncludeCollapsed.checked, row}).map(t => t.replace(/\s*$/, ''));
+        const connArr = visibleTextFromList(row.querySelector('.connectedCell'), {includeCollapsed: exportIncludeCollapsed.checked, row});
+
+        const hideNumbers = document.body.classList.contains('hide-chno');
+        const txOut = hideNumbers ? txArr.map(stripLeadingChNo) : txArr;
+        const rxOut = hideNumbers ? rxArr.map(stripLeadingChNo) : rxArr;
+
+        const maxLen = Math.max(txOut.length, rxOut.length, 1);
+        for (let i=0;i<maxLen;i++){
+          lines.push([dev, manu, model, txOut[i]||'', rxOut[i]||'', connArr[i]||''].map(csvEscape).join(','));
+        }
+      });
+      const csv = '\uFEFF' + lines.join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g,'-');
+      a.href = url; a.download = `dante_snapshot_export_${ts}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+    exportBtn.addEventListener('click', exportVisibleToCSV);
+
+    /* RX/Connected pair height sync for wrap mode */
+    function syncPairHeightsRow(row){
+      const wrapOn = document.body.classList.contains('line-wrap');
+      const rxLis = row.querySelectorAll('.rxCell .rxNamesList li');
+      const cnLis = row.querySelectorAll('.connectedCell .connectedList li');
+      const len = Math.max(rxLis.length, cnLis.length);
+      for (let i=0;i<len;i++){
+        const rx = rxLis[i], cn = cnLis[i]; if (!rx || !cn) continue;
+        rx.style.minHeight = ''; cn.style.minHeight = '';
+        if (!wrapOn) continue;
+        if (rx.style.display==='none' || cn.style.display==='none') continue;
+        const rh = rx.getBoundingClientRect().height, ch = cn.getBoundingClientRect().height;
+        const h = Math.max(rh, ch, 24);
+        rx.style.minHeight = h + 'px'; cn.style.minHeight = h + 'px';
+      }
+    }
+    function syncAllPairHeights(){
+      if (!document.body.classList.contains('line-wrap')){
+        tbody.querySelectorAll('.rxNamesList li, .connectedList li').forEach(li => li.style.minHeight = '');
+        return;
+      }
+      Array.from(tbody.querySelectorAll('tr')).forEach(r => { if(!r.classList.contains('vendor-header') && r.style.display !== 'none') syncPairHeightsRow(r); });
+    }
+    let resizeTO = null;
+    window.addEventListener('resize', ()=>{ if (resizeTO) cancelAnimationFrame(resizeTO); resizeTO = requestAnimationFrame(syncAllPairHeights); });
+
+    /* ---- Draggable column widths via <colgroup> (TX & RX linked, persisted) ---- */
     function makeColumnsResizable(){
       const table = document.getElementById('dataTable');
       const ths = table.querySelectorAll('thead th');
@@ -863,7 +994,7 @@
       loadWidths();
     }
 
-    /* Print width fitter: px -> % during print, then restore */
+    /* ---- Print width fitter: px -> % during print, then restore ---- */
     (function initPrintWidthFit(){
       const table = document.getElementById('dataTable');
       const cols = table.querySelectorAll('colgroup col');
@@ -907,11 +1038,7 @@
       window.addEventListener('afterprint', restoreWidths);
       if (window.matchMedia){
         const mm = window.matchMedia('print');
-        if (mm.addEventListener) {
-          mm.addEventListener('change', (e)=>{ if (!e.matches) restoreWidths(); });
-        } else if (mm.addListener) {
-          mm.addListener((e)=>{ if (!e.matches) restoreWidths(); });
-        }
+        mm.addEventListener?.('change', (e)=>{ if (!e.matches) restoreWidths(); });
       }
     })();
 
@@ -920,14 +1047,6 @@
     deviceSearch.addEventListener('input', applyFiltersAndSync);
     searchInput.addEventListener('input', applyFiltersAndSync);
     includeDeviceInMeta.addEventListener('change', applyFiltersAndSync);
-  </script>
-
-  <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
-    });
-  }
   </script>
 </body>
 </html>
