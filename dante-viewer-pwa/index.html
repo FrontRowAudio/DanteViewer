@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Dante Snapshot Viewer</title>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+<style>
+    :root{
+      --bg:#f6f7fb; --panel:#ffffff; --panel-2:#f1f3f8; --text:#1f2330; --muted:#6b7280; --border:#e5e7eb;
+      --accent:#2563eb; --accent-2:#0ea5e9; --accent-3:#10b981; --chip:#eef2ff; --hover:#f8fafc; --mark-bg:#fff59d;
+      --shadow:0 6px 22px rgba(18,22,33,.08);
+      --calrec:#2b78ff; --calrec-bg:#e9f2ff; --glens:#ff8a00; --glens-bg:#fff1e3;
+      --riedel:#7a3fff; --riedel-bg:#f3eaff; --yamaha:#b59b00; --yamaha-bg:#fffbe0;
+      --shure:#00a651; --shure-bg:#e7f8ef; --tsl:#008080; --tsl-bg:#e6f7f7;
+      --rts:#0091ea; --rts-bg:#e6f5ff; --audinate:#c2185b; --audinate-bg:#fde9f1; --default:#9ca3af; --default-bg:#f4f4f4;
+
+      /* Initial channel width for TX & RX; resizer/colgroup will override */
+      --chan-col-width: 520px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0f1420; --panel:#111827; --panel-2:#0b1220; --text:#e5e7eb; --muted:#9aa1ad; --border:#1f2937; --hover:#0e1627;
+        --shadow:0 10px 30px rgba(0,0,0,.45); --chip:#1f2937; --mark-bg:#665c00;
+        --calrec-bg:#0f1c33; --glens-bg:#2b1900; --riedel-bg:#1b1030; --yamaha-bg:#2a2600; --shure-bg:#0b2015; --tsl-bg:#072324; --rts-bg:#071a28; --audinate-bg:#2b0d18; --default-bg:#1a1f29;
+      }
+    }
+    body.light{ --bg:#f6f7fb; --panel:#ffffff; --panel-2:#f1f3f8; --text:#1f2330; --muted:#6b7280; --border:#e5e7eb; --hover:#f8fafc; --chip:#eef2ff; --mark-bg:#fff59d; --shadow:0 6px 22px rgba(18,22,33,.08);
+      --calrec-bg:#e9f2ff; --glens-bg:#fff1e3; --riedel-bg:#f3eaff; --yamaha-bg:#fffbe0; --shure-bg:#e7f8ef; --tsl-bg:#e6f7f7; --rts-bg:#e6f5ff; --audinate-bg:#fde9f1; --default-bg:#f4f4f4; }
+    body.dark{ --bg:#0f1420; --panel:#111827; --panel-2:#0b1220; --text:#e5e7eb; --muted:#9aa1ad; --border:#1f2937; --hover:#0e1627; --chip:#1f2937; --mark-bg:#665c00; --shadow:0 10px 30px rgba(0,0,0,.45);
+      --calrec-bg:#0f1c33; --glens-bg:#2b1900; --riedel-bg:#1b1030; --yamaha-bg:#2a2600; --shure-bg:#0b2015; --tsl-bg:#072324; --rts-bg:#071a28; --audinate-bg:#2b0d18; --default-bg:#1a1f29; }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{ margin:0; font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial; color:var(--text); background:var(--bg); }
+    .wrap{ max-width:1200px; margin:32px auto; padding:0 16px; }
+
+    header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    header .actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    header .actions .chk{ margin: 0 4px; }
+    .title-wrap{ display:flex; align-items:center; gap:12px; }
+    h1{ font-size:clamp(20px,2vw,28px); margin:0; letter-spacing:.3px; display:flex; align-items:center; gap:10px; }
+    .badge{ font-size:12px; padding:2px 8px; border-radius:999px; background:var(--panel-2); color:var(--muted); border:1px solid var(--border); }
+    header .logo{ height:36px; width:auto; display:block; }
+
+    .print-banner{ display:none; align-items:center; justify-content:space-between; gap:12px; margin:8px 0 0; font-size:12px; color:var(--muted);
+      border-bottom:1px solid var(--border); padding-bottom:6px; }
+
+    /* Collapsible toolbar */
+    .toolbar{ position:sticky; top:0; z-index:5; padding:12px; border:1px solid var(--border); background:var(--panel); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; transition:max-height .25s ease, padding .2s ease; }
+    .toolbar.collapsed{ max-height:44px; padding:6px 12px; }
+    .toolbar-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    @media (max-width:820px){ .toolbar-row{ grid-template-columns:1fr; } }
+    .quickbar{ display:flex; align-items:center; gap:10px; white-space:nowrap; }
+    .tbtn{ border:none; background:transparent; cursor:pointer; font-size:14px; padding:4px 8px; border-radius:999px; color:var(--text); }
+    .tbtn:hover{ background:var(--hover); }
+    .hint{ color:var(--muted); font-size:12px; }
+
+    input[type="file"]{ display:block; width:100%; padding:10px; border:1px dashed var(--border); border-radius:12px; background:var(--panel-2); color:var(--muted); }
+    .input{ padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:var(--panel-2); color:var(--text); outline:none; transition:border .2s, background .2s; }
+    .input:focus{ border-color:var(--accent); background:#fff0; }
+
+    .seg{ display:inline-flex; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+    .seg button{ padding:6px 10px; border:none; background:transparent; cursor:pointer; color:var(--muted); font-weight:600; }
+    .seg button.active{ background:var(--panel); color:var(--text); }
+
+    .chk{ display:flex; align-items:center; gap:8px; color:var(--muted); user-select:none; }
+    .btn{ appearance:none; border:1px solid var(--border); background:var(--panel-2); color:var(--text); padding:10px 12px; border-radius:999px; cursor:pointer; transition:transform .05s, background .2s, border .2s; display:inline-flex; align-items:center; gap:8px; font-weight:600; }
+    .btn:hover{ background:var(--hover); }
+    .btn:active{ transform:translateY(1px); }
+    .btn.primary{ border-color:transparent; background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; }
+    .btn.small{ padding:8px 10px; font-size:12px; }
+
+    .table-wrap{ margin-top:12px; border:1px solid var(--border); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); overflow:auto; }
+    table{ width:100%; border-collapse:separate; border-spacing:0; min-width:1300px; table-layout:fixed; }
+    thead th{ position:sticky; top:0; z-index:3; background:var(--panel); border-bottom:1px solid var(--border); color:var(--muted);
+      font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:12px; padding:12px; cursor:pointer; user-select:none; }
+    thead th .sort{ margin-left:6px; opacity:.8; }
+    tbody td{ padding:12px; border-bottom:1px solid var(--border); vertical-align:top; overflow:hidden; }
+    tbody tr:hover td{ background:var(--hover); }
+    tbody tr:nth-child(odd) td{ background:color-mix(in srgb, var(--panel) 90%, var(--panel-2) 10%); }
+    td.sticky, th.sticky{ position:sticky; left:0; z-index:2; background:inherit; box-shadow:6px 0 0 0 var(--panel); }
+    tbody tr:hover td.sticky{ background:var(--hover); }
+
+    /* colgroup defaults for TX/RX */
+    col[data-col="tx"], col[data-col="rx"]{ width: var(--chan-col-width); }
+
+    /* Lists – no bullets */
+    ul{ margin:0; padding-left:0; list-style:none; }
+
+    /* Channel list items */
+    .txList li, .rxNamesList li, .connectedList li{
+      display:flex; align-items:center; min-height:24px; border-bottom:1px dashed var(--border);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:6px;
+    }
+    body.line-wrap .txList li, body.line-wrap .rxNamesList li, body.line-wrap .connectedList li{
+      white-space:normal; text-overflow:clip;
+    }
+
+    /* Channel numbers bold */
+    .chno{ display:inline-block; min-width:2ch; margin-right:6px; font-weight:700; font-variant-numeric:tabular-nums; }
+    body.hide-chno .chno{ display:none; }
+
+    .rxNamesList li:nth-child(odd), .connectedList li:nth-child(odd){ background:color-mix(in srgb, var(--panel-2) 28%, transparent); }
+    .rxNamesList li.subscribed, .connectedList li.subscribed{ background:color-mix(in srgb, var(--accent-3) 16%, transparent); }
+
+    .subscribed{ border-radius:6px; padding:2px 6px; }
+    .no-sub{ color:var(--muted); }
+    .err-badge{ display:inline-block; font-size:11px; padding:1px 6px; border-radius:999px; margin-left:8px; background:#fef3c7; color:#92400e; border:1px solid #f59e0b; }
+
+    .chip{ display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; background:var(--chip); border:1px solid var(--border); }
+    .vendor-calrec td{ border-left:6px solid var(--calrec); background:var(--calrec-bg); }
+    .vendor-glensound td{ border-left:6px solid var(--glens); background:var(--glens-bg); }
+    .vendor-riedel td{ border-left:6px solid var(--riedel); background:var(--riedel-bg); }
+    .vendor-yamaha td{ border-left:6px solid var(--yamaha); background:var(--yamaha-bg); }
+    .vendor-shure td{ border-left:6px solid var(--shure); background:var(--shure-bg); }
+    .vendor-tsl td{ border-left:6px solid var(--tsl); background:var(--tsl-bg); }
+    .vendor-rts td{ border-left:6px solid var(--rts); background:var(--rts-bg); }
+    .vendor-audinate td{ border-left:6px solid var(--audinate); background:var(--audinate-bg); }
+
+    .chip-calrec{ background:var(--calrec); color:#fff; } .chip-glensound{ background:var(--glens); color:#000; }
+    .chip-riedel{ background:var(--riedel); color:#fff; } .chip-yamaha{ background:var(--yamaha); color:#000; }
+    .chip-shure{ background:var(--shure); color:#fff; } .chip-tsl{ background:var(--tsl); color:#fff; }
+    .chip-rts{ background:var(--rts); color:#fff; } .chip-audinate{ background:var(--audinate); color:#fff; }
+
+    mark{ background:var(--mark-bg); padding:0 .15em; border-radius:3px; }
+
+    /* Compact view tweaks */
+    body.compact thead th{ padding:8px; font-size:11px; }
+    body.compact tbody td{ padding:6px 8px; }
+    body.compact .input, body.compact input[type=file]{ padding:8px 10px; }
+    body.compact .btn{ padding:8px 10px; }
+
+    /* RX collapse */
+    .rx-collapsed .rxCell .rxList{ display:none; }
+    .rx-collapsed .connectedCell .connectedList{ display:none; }
+    .chev{ cursor:pointer; user-select:none; font-weight:700; margin-right:8px; }
+
+    /* TX collapse (global) */
+    .tx-collapsed .txCell .txList{ display:none; }
+
+    /* Vendor headers */
+    .vendor-header td{ position:sticky; top:42px; background:var(--panel); z-index:2; font-weight:800; text-transform:uppercase; color:var(--muted); border-bottom:2px solid var(--border); }
+    .vh-btn{ cursor:pointer; border:none; background:transparent; font-weight:800; margin-right:8px; }
+    .vh-count{ font-size:12px; color:var(--muted); margin-left:8px; }
+
+    /* Notes popover */
+    .note-btn{ margin-left:8px; cursor:pointer; border:1px solid var(--border); background:var(--panel-2); border-radius:6px; padding:2px 6px; font-size:12px; }
+    .note{ display:none; margin-top:6px; }
+    .note textarea{ width:100%; min-height:60px; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--text); }
+
+    /* Column resize handle */
+    th{ position:relative; }
+    th .col-resizer{
+      position:absolute; right:0; top:0; bottom:0; width:8px; cursor:col-resize; user-select:none;
+    }
+    th .col-resizer:hover{ background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+    /* PRINT PACK */
+    @media print{
+      @page { size: landscape; margin: 12mm; }
+      html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      .rxCell .rxList, .connectedCell .connectedList, .txList { display:block !important; }
+
+      /* Ensure table fits page width and wraps */
+      .table-wrap{ overflow: visible !important; }
+      table{ min-width:0 !important; width:100% !important; table-layout:auto !important; }
+      col{ width:auto !important; }
+      th, td{ word-break:break-word; overflow:visible !important; }
+
+      /* Sticky can clip in print—disable it */
+      thead th, th.sticky, td.sticky{ position:static !important; box-shadow:none !important; }
+
+      /* Slightly denser for more columns */
+      thead th{ padding:8px 8px !important; font-size:11px !important; }
+      tbody td{ padding:6px 8px !important; font-size:11px !important; }
+
+      tbody tr { page-break-inside: avoid; break-inside: avoid; }
+      header, .toolbar { display:none !important; }
+      .print-banner { display:flex !important; }
+    }
+    body.ink-saver @media print{
+      .vendor-calrec td, .vendor-glensound td, .vendor-riedel td, .vendor-yamaha td,
+      .vendor-shure td, .vendor-tsl td, .vendor-rts td, .vendor-audinate td {
+        background:#fff !important; border-left-color:#999 !important;
+      }
+    }
+  </style>
+<meta content="yes" name="apple-mobile-web-app-capable"/><meta content="black" name="apple-mobile-web-app-status-bar-style"/><link href="assets/apple-touch-icon-180.png" rel="apple-touch-icon"/><link href="manifest.webmanifest" rel="manifest"/><meta content="#000000" name="theme-color"/></head>
+<body>
+<div class="wrap">
+<header>
+<div class="title-wrap">
+<img alt="Logo" class="logo" src="logo.png"/>
+<h1>Dante Snapshot Viewer <span class="badge">Offline</span></h1>
+</div>
+<div class="actions">
+<select class="input" id="themeSelect" style="width:auto">
+<option value="system">System</option>
+<option value="light">Light</option>
+<option value="dark">Dark</option>
+</select>
+<button class="btn small" id="compactBtn">🧩 Compact</button>
+<!-- Moved here: Ink saver + Export CSV + Print -->
+<label class="chk" title="Reduce color fills in print">
+<input id="inkSaver" type="checkbox"/> Print: ink saver
+        </label>
+<button class="btn small" id="exportCsv" title="Export visible rows">📤 Export CSV</button>
+<button class="btn small" id="printBtn" title="Print or save as PDF">🖨️ Print/PDF</button>
+</div>
+</header>
+<!-- Shown only in print -->
+<div class="print-banner">
+<div id="pb-left">Dante Snapshot Viewer</div>
+<div id="pb-right"></div>
+</div>
+<section class="toolbar">
+<div class="quickbar">
+<button class="tbtn" id="toolbarToggle" title="Collapse/expand controls">▾ Controls</button>
+<span class="hint">Press <b>/</b> to search</span>
+</div>
+<div class="toolbar-row">
+<input accept=".xml" id="fileInput" type="file"/>
+</div>
+<div class="toolbar-row">
+<input class="input" id="deviceSearch" placeholder="🔎 Device search (filters rows by Device Name only)" type="text"/>
+<input class="input" id="searchInput" placeholder="🔎 Channels/Meta search (Manufacturer, Model, TX, RX, Connected)" type="text"/>
+</div>
+<div class="toolbar-row" style="align-items:center">
+<label class="chk"><input id="includeDeviceInMeta" type="checkbox"/> Include device name in Channels/Meta search</label>
+<div class="seg" id="searchMode">
+<button class="active" data-mode="contains" title="Contains">Contains</button>
+<button data-mode="whole" title="Whole word">Whole</button>
+<button data-mode="starts" title="Starts with">Starts</button>
+</div>
+</div>
+<div class="toolbar-row">
+<!-- NEW: TX global toggle -->
+<button class="btn" id="toggleTXAll">▾ Expand all TX</button>
+<button class="btn" id="toggleRX">🎧 Hide RX with No Subscriptions</button>
+<button class="btn" id="toggleDevices">🗂️ Hide Devices with No Subscribed RXs</button>
+<!-- RX expand/collapse single toggle -->
+<button class="btn" id="toggleAllRX">▾ Expand all RX</button>
+<label class="chk"><input id="exportIncludeCollapsed" type="checkbox"/> Include collapsed RX in export</label>
+<!-- (Ink saver + Export CSV moved to header) -->
+</div>
+<div class="toolbar-row">
+<!-- Vendor expand/collapse single toggle -->
+<button class="btn small" id="toggleAllVendors">▾ Expand all Vendors</button>
+<label class="chk"><input id="showOnlyErrors" type="checkbox"/> Show only RX errors</label>
+<label class="chk"><input checked="" id="showChNo" type="checkbox"/> Show channel numbers</label>
+<label class="chk"><input id="allowWrap" type="checkbox"/> Allow line wrap (keep alignment)</label>
+</div>
+</section>
+<div class="table-wrap">
+<table id="dataTable">
+<!-- colgroup for reliable column sizing/resizing -->
+<colgroup>
+<col data-col="device"/>
+<col data-col="manufacturer"/>
+<col data-col="model"/>
+<col data-col="tx"/>
+<col data-col="rx"/>
+<col data-col="connected"/>
+</colgroup>
+<thead>
+<tr>
+<th class="sticky" data-col="device">Device <span class="sort"></span><span class="col-resizer"></span></th>
+<th data-col="manufacturer">Manufacturer <span class="sort"></span><span class="col-resizer"></span></th>
+<th data-col="model">Model <span class="sort"></span><span class="col-resizer"></span></th>
+<th data-col="tx">TX Channels <span class="sort"></span><span class="col-resizer"></span></th>
+<th data-col="rx">RX Channel <span class="sort"></span><span class="col-resizer"></span></th>
+<th data-col="connected">Connected Source <span class="sort"></span><span class="col-resizer"></span></th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+<script>
+    const tbody = document.querySelector("#dataTable tbody");
+    const deviceSearch = document.getElementById('deviceSearch');
+    const searchInput = document.getElementById('searchInput');
+    const includeDeviceInMeta = document.getElementById('includeDeviceInMeta');
+    const toggleRXButton = document.getElementById('toggleRX');
+    const toggleDevicesButton = document.getElementById('toggleDevices');
+    const toggleAllRX = document.getElementById('toggleAllRX');
+    const toggleAllVendors = document.getElementById('toggleAllVendors');
+    const toggleTXAll = document.getElementById('toggleTXAll');
+    const exportBtn = document.getElementById('exportCsv');
+    const exportIncludeCollapsed = document.getElementById('exportIncludeCollapsed');
+    const compactBtn = document.getElementById('compactBtn');
+    const themeSelect = document.getElementById('themeSelect');
+    const printBtn = document.getElementById('printBtn');
+    const toolbar = document.querySelector('.toolbar');
+    const toolbarToggle = document.getElementById('toolbarToggle');
+    const searchModeSeg = document.getElementById('searchMode');
+    const showOnlyErrorsChk = document.getElementById('showOnlyErrors');
+    const showChNo = document.getElementById('showChNo');
+    const allowWrap = document.getElementById('allowWrap');
+    const inkSaver = document.getElementById('inkSaver');
+
+    let hideEmptyRX = false;
+    let hideDevices = false;
+    let snapshotHash = 'default';
+    let searchMode = 'contains'; // contains | whole | starts
+    let sortState = []; // [{col:'manufacturer', dir:1}, ...]
+    let loadedFileName = '';
+    let allRxExpanded = true;
+    let allVendorsExpanded = true;
+    let allTxExpanded = true;
+
+    /* Theme (3-state) */
+    function applyTheme(mode){
+      document.body.classList.remove('light','dark');
+      if (mode === 'light' || mode === 'dark') document.body.classList.add(mode);
+      localStorage.setItem('dante_theme_mode', mode);
+      themeSelect.value = mode;
+    }
+    (function initTheme(){
+      const saved = localStorage.getItem('dante_theme_mode') || 'system';
+      applyTheme(saved);
+    })();
+    themeSelect.addEventListener('change', e => applyTheme(e.target.value));
+
+    /* Toolbar collapse & shortcut */
+    function setToolbarCollapsed(collapsed){
+      toolbar.classList.toggle('collapsed', collapsed);
+      localStorage.setItem('dante_toolbar_collapsed', collapsed ? '1' : '0');
+      toolbarToggle.textContent = collapsed ? '▸ Controls' : '▾ Controls';
+    }
+    (function initToolbar(){
+      const saved = localStorage.getItem('dante_toolbar_collapsed') === '1';
+      setToolbarCollapsed(saved);
+    })();
+    toolbarToggle.addEventListener('click', () => setToolbarCollapsed(!toolbar.classList.contains('collapsed')));
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        if (toolbar.classList.contains('collapsed')) setToolbarCollapsed(false);
+        searchInput?.focus();
+      }
+    });
+
+    compactBtn.addEventListener('click', () => {
+      document.body.classList.toggle('compact');
+      compactBtn.classList.toggle('primary', document.body.classList.contains('compact'));
+    });
+
+    /* Print helpers */
+    function formatNow(){
+      const d = new Date();
+      return d.toLocaleString([], {year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+    }
+    function updatePrintBanner(){
+      const left = document.getElementById('pb-left');
+      const right = document.getElementById('pb-right');
+      if (left) left.textContent = 'Dante Snapshot Viewer';
+      if (right) right.textContent = `${loadedFileName || 'snapshot'} • ${formatNow()}`;
+    }
+    printBtn.addEventListener('click', () => { updatePrintBanner(); window.print(); });
+    if ('onbeforeprint' in window){ window.addEventListener('beforeprint', updatePrintBanner); }
+    inkSaver?.addEventListener('change', ()=> document.body.classList.toggle('ink-saver', !!inkSaver.checked));
+
+    /* Search mode segmented control */
+    searchModeSeg.addEventListener('click', (e)=>{
+      if (e.target.tagName !== 'BUTTON') return;
+      [...searchModeSeg.children].forEach(b=>b.classList.remove('active'));
+      e.target.classList.add('active');
+      searchMode = e.target.dataset.mode;
+      applyFilters();
+    });
+
+    /* Vendor colors (dynamic fallback for unknowns) */
+    const dynamicVendorMap = JSON.parse(localStorage.getItem('dante_vendor_dynmap') || '{}');
+    const dynamicPalette = ['#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#f97316','#22c55e','#e11d48','#06b6d4','#84cc16','#a855f7','#f43f5e','#eab308','#3b82f6'];
+    function getDynamicColorFor(vendor){
+      const key = vendor.toLowerCase();
+      if (dynamicVendorMap[key]) return dynamicVendorMap[key];
+      const used = Object.values(dynamicVendorMap);
+      const next = dynamicPalette.find(c => !used.includes(c)) || dynamicPalette[(Object.keys(dynamicVendorMap).length)%dynamicPalette.length];
+      dynamicVendorMap[key] = next;
+      localStorage.setItem('dante_vendor_dynmap', JSON.stringify(dynamicVendorMap));
+      return next;
+    }
+    function hexToRgb(hex){const m=hex.replace('#','');const n=parseInt(m.length===3?m.split('').map(x=>x+x).join(''):m,16);return {r:(n>>16)&255,g:(n>>8)&255,b:n&255};}
+    function idealTextColor(bg){const {r,g,b}=hexToRgb(bg);const yiq=((r*299)+(g*587)+(b*114))/1000;return yiq>=128?'#000':'#fff';}
+    function mixBg(hex){ return 'color-mix(in srgb, '+hex+' 12%, var(--panel))'; }
+    function vendorClasses(vendorRaw) {
+      const v = (vendorRaw || "").trim(); const lower = v.toLowerCase();
+      if (lower.includes("calrec")) return { rowClass:"vendor-calrec", chipClass:"chip-calrec" };
+      if (lower.includes("glensound")) return { rowClass:"vendor-glensound", chipClass:"chip-glensound" };
+      if (lower.includes("riedel")) return { rowClass:"vendor-riedel", chipClass:"chip-riedel" };
+      if (lower.includes("yamaha")) return { rowClass:"vendor-yamaha", chipClass:"chip-yamaha" };
+      if (lower.includes("shure")) return { rowClass:"vendor-shure", chipClass:"chip-shure" };
+      if (lower.includes("tsl")) return { rowClass:"vendor-tsl", chipClass:"chip-tsl" };
+      if (lower.includes("rts")) return { rowClass:"vendor-rts", chipClass:"chip-rts" };
+      if (lower.includes("audinate")) return { rowClass:"vendor-audinate", chipClass:"chip-audinate" };
+      const dyn = getDynamicColorFor(v || 'unknown');
+      return { rowStyle:`border-left:6px solid ${dyn}; background:${mixBg(dyn)}`, chipStyle:`background:${dyn}; color:${idealTextColor(dyn)};`, rowClass:'' };
+    }
+
+    /* Highlights */
+    function escReg(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }
+    function highlightText(text, query){ if (!query) return text; const r=new RegExp(`(${escReg(query)})`,'gi'); return text.replace(r,'<mark>$1</mark>'); }
+    function clearHighlights(root){ root.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)); }
+
+    /* Snapshot hash (notes per file) */
+    function djb2(str){let h=5381;for(let i=0;i<str.length;i++){h=((h<<5)+h)+str.charCodeAt(i);}return (h>>>0).toString(36);}
+
+    /* TX index for error surfacing */
+    function buildTxIndex(xmlDoc){
+      const index = {}; const devices = xmlDoc.getElementsByTagName("device");
+      Array.from(devices).forEach(d=>{
+        const name = d.querySelector("name")?.textContent || "";
+        const txLabels = new Set(Array.from(d.getElementsByTagName("txchannel")).map(tx=> tx.querySelector("label")?.textContent || ""));
+        index[name] = txLabels;
+      });
+      return index;
+    }
+
+    /* File load */
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0]; if (!file) return;
+      loadedFileName = file.name || '';
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const xmlText = event.target.result;
+        snapshotHash = djb2(xmlText);
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlText, "application/xml");
+        const devices = Array.from(xml.getElementsByTagName("device"));
+        const txIndex = buildTxIndex(xml);
+
+        const rowsData = devices.map(device => {
+          const name = device.querySelector("name")?.textContent || "";
+          const manufacturer = device.querySelector("manufacturer_name")?.textContent || "";
+          const model = device.querySelector("model_name")?.textContent || "";
+
+          const txLabels = Array.from(device.getElementsByTagName("txchannel")).map(tx => tx.querySelector("label")?.textContent || "");
+
+          let hasSubscribed = false;
+          const rxItems = Array.from(device.getElementsByTagName("rxchannel")).map(rx => {
+            const rxName = rx.querySelector("name")?.textContent || "";
+            const subDevice = rx.querySelector("subscribed_device")?.textContent || "";
+            const subChannel = rx.querySelector("subscribed_channel")?.textContent || "";
+            const isSubscribed = !!(subDevice || subChannel);
+            if (isSubscribed) hasSubscribed = true;
+
+            let err = '';
+            if (isSubscribed) {
+              if (!txIndex[subDevice]) err = 'Missing device';
+              else if (!txIndex[subDevice].has(subChannel)) err = 'No such TX';
+            }
+            return { rxName, connected: isSubscribed ? `${subDevice}:${subChannel}` : '', isSubscribed, err };
+          });
+
+          return { name, manufacturer, model, txLabels, rxItems, hasSubscribed };
+        });
+
+        renderGrouped(rowsData);
+        applyFilters();
+        applyToggles();
+        syncAllPairHeights();
+      };
+      reader.readAsText(file);
+    });
+
+    function renderGrouped(rowsData){
+      tbody.innerHTML = "";
+      const groups = {};
+      rowsData.forEach(r => (groups[r.manufacturer] ??= []).push(r));
+
+      Object.keys(groups).sort((a,b)=> a.localeCompare(b)).forEach(vendor => {
+        const head = document.createElement('tr');
+        head.className = 'vendor-header';
+        head.dataset.vendor = vendor;
+        const vCls = vendorClasses(vendor);
+        const chip = vCls.chipClass ? `<span class="chip ${vCls.chipClass}">${vendor || 'Unknown'}</span>` :
+                                      `<span class="chip" style="${vCls.chipStyle||''}">${vendor || 'Unknown'}</span>`;
+        head.innerHTML = `<td colspan="6"><button class="vh-btn">▾</button>${chip} <span class="vh-count">Devices: ${groups[vendor].length}</span></td>`;
+        tbody.appendChild(head);
+
+        groups[vendor].sort((a,b)=> a.name.localeCompare(b.name)).forEach(d => {
+          const row = document.createElement("tr");
+          const v = vendorClasses(d.manufacturer);
+          if (v.rowClass) row.classList.add(v.rowClass);
+          if (!d.hasSubscribed) row.classList.add('no-subs-device');
+          row.dataset.vendor = vendor;
+
+          const noteKey = `note_${snapshotHash}_${d.name}`;
+          const noteVal = localStorage.getItem(noteKey) || '';
+
+          const txHTML = `<ul class="txList">${
+            d.txLabels.map((label, i) => {
+              const safeTitle = label.replace(/"/g,'&quot;');
+              const chNo = i + 1;
+              return `<li class="tx" title="${safeTitle}"><span class="chno">${chNo}.</span> ${label}</li>`;
+            }).join('')
+          }</ul>`;
+
+          const rxNamesHTML = `<ul class="rxList rxNamesList">${
+            d.rxItems.map((x, i) => {
+              const cls = x.isSubscribed ? 'subscribed' : 'no-sub';
+              const err = x.err ? `<span class="err-badge">${x.err}</span>` : '';
+              const safeTitle = x.rxName.replace(/"/g, '&quot;');
+              const chNo = i + 1;
+              return `<li class="${cls}" title="${safeTitle}"><span class="chno">${chNo}.</span> ${x.rxName}${err}</li>`;
+            }).join('')
+          }</ul>`;
+
+          const connectedHTML = `<ul class="connectedList">${
+            d.rxItems.map(x=>{
+              const safeTitle = (x.connected || '').replace(/"/g, '&quot;');
+              return `<li class="${x.isSubscribed ? 'subscribed' : 'no-sub'}" title="${safeTitle}">${x.connected}</li>`;
+            }).join('')
+          }</ul>`;
+
+          row.innerHTML = `
+            <td class="devName sticky"><span class="chev" title="Collapse/expand RX">▾</span>${d.name}
+              <button class="note-btn" title="Add note">✏️ Note</button>
+              <div class="note"><textarea placeholder="Device notes...">${noteVal}</textarea></div>
+            </td>
+            <td class="manu">
+              ${v.chipClass ? `<span class="chip ${v.chipClass}" data-text="${d.manufacturer.replace(/"/g,'&quot;')}">${d.manufacturer}</span>` :
+                              `<span class="chip" style="${v.chipStyle||''}" data-text="${d.manufacturer.replace(/"/g,'&quot;')}">${d.manufacturer}</span>`}
+            </td>
+            <td class="model">${d.model}</td>
+            <td class="txCell">${txHTML}</td>
+            <td class="rxCell">${rxNamesHTML}</td>
+            <td class="connectedCell">${connectedHTML}</td>`;
+          if (v.rowStyle){ row.querySelectorAll('td').forEach(td=> td.setAttribute('style', v.rowStyle)); }
+          tbody.appendChild(row);
+
+          row.dataset.noteKey = noteKey;
+        });
+      });
+
+      initChevronsForAllRows();
+      initVendorHeaders();
+      initNotes();
+      initSorting();
+      makeColumnsResizable(); // ensure resizer binds after render
+      afterRenderUiSync();
+    }
+
+    /* Expand/Collapse toggles */
+    function setRxCollapsed(row, collapsed){
+      const chev = row.querySelector('.chev');
+      if (!chev) return;
+      row.classList.toggle('rx-collapsed', collapsed);
+      row.dataset.rxCollapsed = collapsed ? '1' : '0';
+      chev.textContent = collapsed ? '▸' : '▾';
+    }
+    function isRxCollapsed(row){ return row.classList.contains('rx-collapsed'); }
+    function initChevronsForAllRows(){ tbody.querySelectorAll('tr').forEach(r => { if (!r.classList.contains('vendor-header')) setRxCollapsed(r, false); }); }
+
+    function setAllRX(expanded){
+      tbody.querySelectorAll('tr').forEach(r=>{
+        if (!r.classList.contains('vendor-header')){
+          setRxCollapsed(r, !expanded);
+        }
+      });
+      allRxExpanded = expanded;
+      toggleAllRX.textContent = expanded ? '▸ Collapse all RX' : '▾ Expand all RX';
+      syncAllPairHeights();
+    }
+    toggleAllRX.addEventListener('click', ()=> setAllRX(!allRxExpanded));
+
+    function setTxCollapsed(row, collapsed){
+      row.classList.toggle('tx-collapsed', collapsed);
+    }
+    function setAllTX(expanded){
+      tbody.querySelectorAll('tr').forEach(r=>{
+        if (!r.classList.contains('vendor-header')){
+          setTxCollapsed(r, !expanded);
+        }
+      });
+      allTxExpanded = expanded;
+      toggleTXAll.textContent = expanded ? '▸ Collapse all TX' : '▾ Expand all TX';
+      syncAllPairHeights();
+    }
+    toggleTXAll.addEventListener('click', ()=> setAllTX(!allTxExpanded));
+
+    function setVendorCollapsed(vendor, collapsed){
+      const rows = tbody.querySelectorAll(`tr[data-vendor="${CSS.escape(vendor)}"]:not(.vendor-header)`);
+      rows.forEach(r => r.style.display = collapsed ? 'none' : '');
+      const hdr = tbody.querySelector(`tr.vendor-header[data-vendor="${CSS.escape(vendor)}"] .vh-btn`);
+      if (hdr) hdr.textContent = collapsed ? '▸' : '▾';
+    }
+    function initVendorHeaders(){
+      tbody.querySelectorAll('.vendor-header').forEach(h=>{
+        const btn = h.querySelector('.vh-btn');
+        btn.addEventListener('click', ()=> {
+          const vendor = h.dataset.vendor || '';
+          const anyShown = Array.from(tbody.querySelectorAll(`tr[data-vendor="${CSS.escape(vendor)}"]:not(.vendor-header)`)).some(r=> r.style.display !== 'none');
+          setVendorCollapsed(vendor, anyShown);
+          syncAllPairHeights();
+        });
+      });
+    }
+    function setAllVendors(expanded){
+      tbody.querySelectorAll('.vendor-header').forEach(h=> setVendorCollapsed(h.dataset.vendor||'', !expanded));
+      allVendorsExpanded = expanded;
+      toggleAllVendors.textContent = expanded ? '▸ Collapse all Vendors' : '▾ Expand all Vendors';
+      syncAllPairHeights();
+    }
+    toggleAllVendors.addEventListener('click', ()=> setAllVendors(!allVendorsExpanded));
+
+    function afterRenderUiSync(){
+      toggleAllRX.textContent = allRxExpanded ? '▸ Collapse all RX' : '▾ Expand all RX';
+      toggleAllVendors.textContent = allVendorsExpanded ? '▸ Collapse all Vendors' : '▾ Expand all Vendors';
+      toggleTXAll.textContent = allTxExpanded ? '▸ Collapse all TX' : '▾ Expand all TX';
+    }
+
+    /* Notes */
+    function initNotes(){
+      tbody.addEventListener('click', (e)=>{
+        const btn = e.target.closest('.note-btn'); if (!btn) return;
+        const row = btn.closest('tr'); const wrap = row.querySelector('.note'); const ta = wrap.querySelector('textarea');
+        wrap.style.display = wrap.style.display === 'block' ? 'none' : 'block';
+        if (wrap.style.display === 'block') ta.focus();
+      });
+      tbody.addEventListener('input', (e)=>{
+        const ta = e.target.closest('.note textarea'); if (!ta) return;
+        const row = e.target.closest('tr'); const key = row.dataset.noteKey; localStorage.setItem(key, ta.value);
+      });
+    }
+
+    /* Filtering helpers */
+    function matchesMode(text, q){
+      if (!q) return true;
+      const t = text.toLowerCase(), s = q.toLowerCase();
+      if (searchMode === 'contains') return t.includes(s);
+      if (searchMode === 'starts') return t.startsWith(s) || t.split(/\\s+/).some(tok => tok.startsWith(s));
+      if (searchMode === 'whole') return t.split(/\\W+/).some(tok => tok === s);
+      return t.includes(s);
+    }
+
+    function applyFilters() {
+      const devFilter = deviceSearch.value.trim().toLowerCase();
+      const metaFilter = searchInput.value.trim().toLowerCase();
+      const includeDevice = includeDeviceInMeta.checked;
+      const showOnlyErrors = showOnlyErrorsChk.checked;
+
+      tbody.querySelectorAll('tr').forEach(row => clearHighlights(row));
+      const deviceRows = Array.from(tbody.querySelectorAll('tr')).filter(r=> !r.classList.contains('vendor-header'));
+
+      deviceRows.forEach(row => {
+        const devNameCell = row.querySelector('.devName');
+        const manuChip    = row.querySelector('.manu .chip');
+        const modelCell   = row.querySelector('.model');
+
+        const txLis       = row.querySelectorAll('.txCell li');
+        const rxNameLis   = row.querySelectorAll('.rxCell .rxNamesList li');
+        const connLis     = row.querySelectorAll('.connectedCell .connectedList li');
+
+        const devNameText = devNameCell?.textContent || '';
+        const manuText = manuChip?.dataset.text || manuChip?.textContent || '';
+        const modelText = modelCell?.textContent || '';
+
+        const deviceMatches = (!devFilter) || devNameText.toLowerCase().includes(devFilter);
+
+        let metaMatchesMetaCols = false;
+        if (metaFilter) {
+          if (matchesMode(manuText, metaFilter)) metaMatchesMetaCols = true;
+          if (matchesMode(modelText, metaFilter)) metaMatchesMetaCols = true;
+          if (includeDevice && matchesMode(devNameText, metaFilter)) metaMatchesMetaCols = true;
+        }
+
+        let anyVisibleLi = false;
+
+        txLis.forEach(li => {
+          const plain = li.textContent;
+          const visible = !metaFilter || matchesMode(plain, metaFilter);
+          li.style.display = visible ? '' : 'none';
+          if (visible && metaFilter) li.innerHTML = highlightText(plain, metaFilter);
+          if (visible) anyVisibleLi = true;
+        });
+
+        const len = Math.max(rxNameLis.length, connLis.length);
+        for (let i=0; i<len; i++){
+          const rxLi = rxNameLis[i], cnLi = connLis[i];
+          if (!rxLi || !cnLi) continue;
+
+          const rxText = rxLi.textContent, cnText = cnLi.textContent;
+          const pairMatches = !metaFilter || matchesMode(rxText, metaFilter) || matchesMode(cnText, metaFilter);
+          const errOk = !showOnlyErrors || rxLi.querySelector('.err-badge');
+          const visible = pairMatches && errOk;
+
+          rxLi.style.display = visible ? '' : 'none';
+          cnLi.style.display = visible ? '' : 'none';
+
+          if (visible && metaFilter) {
+            const hadErr = !!rxLi.querySelector('.err-badge');
+            const errHTML = hadErr ? rxLi.querySelector('.err-badge').outerHTML : '';
+            rxLi.innerHTML = highlightText(rxText.replace(/\\s*$/, ''), metaFilter) + (hadErr ? errHTML : '');
+            cnLi.innerHTML = highlightText(cnText, metaFilter);
+          }
+          if (visible) anyVisibleLi = true;
+        }
+
+        if (metaFilter) {
+          modelCell.innerHTML = highlightText(modelText, metaFilter);
+          if (manuChip) manuChip.innerHTML = highlightText(manuText, metaFilter);
+          if (includeDevice) devNameCell.innerHTML = highlightText(devNameText, metaFilter);
+        }
+        if (devFilter) devNameCell.innerHTML = highlightText(devNameCell.textContent, devFilter);
+
+        const metaAllowsRow = (!metaFilter) || metaMatchesMetaCols || anyVisibleLi;
+        row.style.display = (deviceMatches && metaAllowsRow) ? '' : 'none';
+      });
+
+      tbody.querySelectorAll('.vendor-header').forEach(h=>{
+        const vendor = h.dataset.vendor || '';
+        const anyVisible = Array.from(tbody.querySelectorAll(`tr[data-vendor="${CSS.escape(vendor)}"]:not(.vendor-header)`)).some(r => r.style.display !== 'none');
+        h.style.display = anyVisible ? '' : 'none';
+      });
+
+      applyToggles();
+      syncAllPairHeights();
+    }
+
+    function applyToggles() {
+      tbody.querySelectorAll('.rxNamesList li.no-sub, .connectedList li.no-sub').forEach(li => {
+        li.style.display = hideEmptyRX ? 'none' : li.style.display;
+      });
+      tbody.querySelectorAll('tr.no-subs-device').forEach(row => {
+        if (hideDevices) { row.dataset.prevDisplay = row.style.display || ''; row.style.display = 'none'; }
+        else if (row.dataset.prevDisplay !== undefined) { row.style.display = row.dataset.prevDisplay; delete row.dataset.prevDisplay; }
+      });
+    }
+
+    deviceSearch.addEventListener('input', applyFilters);
+    searchInput.addEventListener('input', applyFilters);
+    includeDeviceInMeta.addEventListener('change', applyFilters);
+    showOnlyErrorsChk.addEventListener('change', applyFilters);
+
+    /* Sorting with indicators & multi-sort (Shift+click) */
+    function initSorting(){
+      const ths = document.querySelectorAll('thead th');
+      ths.forEach(th => {
+        th.addEventListener('click', (e)=>{
+          if (e.target.closest('.col-resizer')) return; // ignore resizer
+          const col = th.dataset.col; if (!col) return;
+          const existing = sortState.find(s => s.col === col);
+          const shift = e.shiftKey;
+          if (existing){ existing.dir = -existing.dir; if (!shift){ sortState = [existing]; } }
+          else { const entry = {col, dir:1}; sortState = shift ? [...sortState, entry] : [entry]; }
+          applySort(); renderSortIndicators(); syncAllPairHeights();
+        });
+      });
+    }
+    function colGetter(row, col){
+      if (row.classList.contains('vendor-header')) return '';
+      if (col === 'device') return row.querySelector('.devName')?.textContent.trim() || '';
+      if (col === 'manufacturer') return row.querySelector('.manu .chip')?.getAttribute('data-text') || row.querySelector('.manu')?.textContent.trim() || '';
+      if (col === 'model') return row.querySelector('.model')?.textContent.trim() || '';
+      if (col === 'tx') return Array.from(row.querySelectorAll('.txCell li')).map(li=>li.textContent.trim()).join(' ');
+      if (col === 'rx') return Array.from(row.querySelectorAll('.rxCell li')).map(li=>li.textContent.trim()).join(' ');
+      if (col === 'connected') return Array.from(row.querySelectorAll('.connectedCell li')).map(li=>li.textContent.trim()).join(' ');
+      return '';
+    }
+    function applySort(){
+      const vendors = Array.from(tbody.querySelectorAll('.vendor-header')).map(h=> h.dataset.vendor || '');
+      vendors.forEach(vendor=>{
+        const header = tbody.querySelector(`.vendor-header[data-vendor="${CSS.escape(vendor)}"]`);
+        const rows = Array.from(tbody.querySelectorAll(`tr[data-vendor="${CSS.escape(vendor)}"]:not(.vendor-header)`));
+        rows.sort((a,b)=>{
+          for (const s of sortState){
+            const av = colGetter(a, s.col).toLowerCase();
+            const bv = colGetter(b, s.col).toLowerCase();
+            const cmp = av.localeCompare(bv);
+            if (cmp !== 0) return s.dir * cmp;
+          }
+          return 0;
+        });
+        let next = header.nextSibling;
+        rows.forEach(r => tbody.insertBefore(r, next), next=header.nextSibling);
+      });
+    }
+    function renderSortIndicators(){
+      document.querySelectorAll('thead th .sort').forEach(s=> s.textContent = '');
+      sortState.forEach((s, idx)=>{
+        const th = document.querySelector(`thead th[data-col="${s.col}"] .sort`);
+        if (th) th.textContent = (s.dir===1?'▲':'▼') + (sortState.length>1?`(${idx+1})`:``);
+      });
+    }
+
+    /* Toggles */
+    toggleRXButton.addEventListener('click', () => {
+      hideEmptyRX = !hideEmptyRX;
+      toggleRXButton.classList.toggle('primary', hideEmptyRX);
+      toggleRXButton.textContent = hideEmptyRX ? "🎧 Show RX with No Subscriptions" : "🎧 Hide RX with No Subscriptions";
+      applyFilters();
+    });
+    toggleDevicesButton.addEventListener('click', () => {
+      hideDevices = !hideDevices;
+      toggleDevicesButton.classList.toggle('primary', hideDevices);
+      toggleDevicesButton.textContent = hideDevices ? "🗂️ Show Devices with No Subscribed RXs" : "🗂️ Hide Devices with No Subscribed RXs";
+      applyFilters();
+    });
+
+    /* Channel numbers toggle (persisted) */
+    (function initChNo(){
+      const saved = localStorage.getItem('dante_show_chno');
+      const show = saved === null ? true : saved === '1';
+      document.body.classList.toggle('hide-chno', !show);
+      if (showChNo) showChNo.checked = show;
+    })();
+    showChNo?.addEventListener('change', ()=>{
+      const show = !!showChNo.checked;
+      document.body.classList.toggle('hide-chno', !show);
+      localStorage.setItem('dante_show_chno', show ? '1' : '0');
+      syncAllPairHeights();
+    });
+
+    /* Line wrap toggle (persisted) */
+    (function initWrap(){
+      const saved = localStorage.getItem('dante_allow_wrap') === '1';
+      document.body.classList.toggle('line-wrap', saved);
+      if (allowWrap) allowWrap.checked = saved;
+    })();
+    allowWrap?.addEventListener('change', ()=>{
+      const on = !!allowWrap.checked;
+      document.body.classList.toggle('line-wrap', on);
+      localStorage.setItem('dante_allow_wrap', on ? '1' : '0');
+      syncAllPairHeights();
+    });
+
+    /* CSV export */
+    function csvEscape(s){ const cleaned = s.replace(/\\r?\\n+/g,' ').replace(/\\s+/g,' ').trim(); return `"`+cleaned.replace(/"/g,'""')+`"`; }
+    function stripLeadingChNo(s){ return s.replace(/^\\s*\\d+\\.\\s*/, ''); }
+    function visibleTextFromList(cell, {includeCollapsed=false, row} = {}){
+      const list = cell?.querySelector('ul'); if (!list) return [];
+      const collapsed = row && row.classList.contains('rx-collapsed');
+      const lis = Array.from(list.querySelectorAll('li')).filter(li => {
+        if (getComputedStyle(li).display === 'none') return false;
+        if (!includeCollapsed && collapsed && (cell.classList.contains('rxCell') || cell.classList.contains('connectedCell'))) return false;
+        return li.offsetParent !== null;
+      });
+      return lis.map(li => li.textContent.trim());
+    }
+    function exportVisibleToCSV(){
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.classList.contains('vendor-header') && r.offsetParent !== null && getComputedStyle(r).display !== 'none');
+      const header = ['Device','Manufacturer','Model','TX Channel','RX Channel','Connected Source'];
+      const lines = [header.map(csvEscape).join(',')];
+      rows.forEach(row => {
+        const dev = (row.querySelector('.devName')?.textContent || '').replace(/^[▾▸]\\s*/,'').trim();
+        const manuChip = row.querySelector('.manu .chip');
+        const manu = manuChip?.getAttribute('data-text') || manuChip?.textContent.trim() || '';
+        const model = row.querySelector('.model')?.textContent.trim() || '';
+
+        const txArr = visibleTextFromList(row.querySelector('.txCell'), {row});
+        const rxArr = visibleTextFromList(row.querySelector('.rxCell'), {includeCollapsed: exportIncludeCollapsed.checked, row}).map(t => t.replace(/\\s*$/, ''));
+        const connArr = visibleTextFromList(row.querySelector('.connectedCell'), {includeCollapsed: exportIncludeCollapsed.checked, row});
+
+        const hideNumbers = document.body.classList.contains('hide-chno');
+        const txOut = hideNumbers ? txArr.map(stripLeadingChNo) : txArr;
+        const rxOut = hideNumbers ? rxArr.map(stripLeadingChNo) : rxArr;
+
+        const maxLen = Math.max(txOut.length, rxOut.length, 1);
+        for (let i=0;i<maxLen;i++){
+          lines.push([dev, manu, model, txOut[i]||'', rxOut[i]||'', connArr[i]||''].map(csvEscape).join(','));
+        }
+      });
+      const csv = '\\uFEFF' + lines.join('\\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g,'-');
+      a.href = url; a.download = `dante_snapshot_export_${ts}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+    exportBtn.addEventListener('click', exportVisibleToCSV);
+
+    /* RX/Connected pair height sync for wrap mode */
+    function syncPairHeightsRow(row){
+      const wrapOn = document.body.classList.contains('line-wrap');
+      const rxLis = row.querySelectorAll('.rxCell .rxNamesList li');
+      const cnLis = row.querySelectorAll('.connectedCell .connectedList li');
+      const len = Math.max(rxLis.length, cnLis.length);
+      for (let i=0;i<len;i++){
+        const rx = rxLis[i], cn = cnLis[i]; if (!rx || !cn) continue;
+        rx.style.minHeight = ''; cn.style.minHeight = '';
+        if (!wrapOn) continue;
+        if (rx.style.display==='none' || cn.style.display==='none') continue;
+        const rh = rx.getBoundingClientRect().height, ch = cn.getBoundingClientRect().height;
+        const h = Math.max(rh, ch, 24);
+        rx.style.minHeight = h + 'px'; cn.style.minHeight = h + 'px';
+      }
+    }
+    function syncAllPairHeights(){
+      if (!document.body.classList.contains('line-wrap')){
+        tbody.querySelectorAll('.rxNamesList li, .connectedList li').forEach(li => li.style.minHeight = '');
+        return;
+      }
+      Array.from(tbody.querySelectorAll('tr')).forEach(r => { if(!r.classList.contains('vendor-header') && r.style.display !== 'none') syncPairHeightsRow(r); });
+    }
+    let resizeTO = null;
+    window.addEventListener('resize', ()=>{ if (resizeTO) cancelAnimationFrame(resizeTO); resizeTO = requestAnimationFrame(syncAllPairHeights); });
+
+    /* ---- Draggable column widths via <colgroup> (TX & RX linked, persisted) ---- */
+    function makeColumnsResizable(){
+      const table = document.getElementById('dataTable');
+      const ths = table.querySelectorAll('thead th');
+      const cols = table.querySelectorAll('colgroup col');
+      const MIN_PX = 120;
+      const LINKED = new Map([ ['tx','rx'], ['rx','tx'] ]);
+      const STORAGE_KEY = 'dante_colwidths_v2';
+
+      const thByKey = {}; const colByKey = {};
+      ths.forEach(th => { if (th.dataset.col) thByKey[th.dataset.col] = th; });
+      cols.forEach(c => { if (c.dataset.col) colByKey[c.dataset.col] = c; });
+
+      function currentWidthPx(el){
+        const w = parseFloat(getComputedStyle(el).width);
+        return Number.isFinite(w) ? w : el.offsetWidth;
+      }
+      function setColWidth(colKey, px){
+        const col = colByKey[colKey]; if (!col) return;
+        col.style.width = px + 'px';
+      }
+      function saveWidths(){
+        const map = {};
+        Object.keys(colByKey).forEach(k=>{
+          const th = thByKey[k]; if (!th) return;
+          map[k] = Math.round(currentWidthPx(th));
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+      }
+      function loadWidths(){
+        try{
+          const map = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+          Object.entries(map).forEach(([k,px])=>{
+            if (!px) return;
+            setColWidth(k, px);
+            const mate = LINKED.get(k);
+            if (mate) setColWidth(mate, px);
+          });
+        }catch{}
+      }
+
+      let dragging = null;
+
+      ths.forEach(th=>{
+        const handle = th.querySelector('.col-resizer');
+        if (!handle) return;
+
+        handle.addEventListener('click', e => e.stopPropagation());
+        handle.addEventListener('mousedown', (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          const key = th.dataset.col;
+          dragging = { startX: e.clientX, startW: currentWidthPx(th), key };
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+        });
+      });
+
+      window.addEventListener('mousemove', (e)=>{
+        if (!dragging) return;
+        const dx = e.clientX - dragging.startX;
+        const newW = Math.max(MIN_PX, Math.round(dragging.startW + dx));
+        setColWidth(dragging.key, newW);
+        const mate = LINKED.get(dragging.key);
+        if (mate) setColWidth(mate, newW);
+        if (document.body.classList.contains('line-wrap')) requestAnimationFrame(()=>{ try{ syncAllPairHeights(); }catch{} });
+      });
+
+      window.addEventListener('mouseup', ()=>{
+        if (!dragging) return;
+        dragging = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        saveWidths();
+      });
+
+      loadWidths();
+    }
+
+    /* ---- Print width fitter: px -> % during print, then restore ---- */
+    (function initPrintWidthFit(){
+      const table = document.getElementById('dataTable');
+      const cols = table.querySelectorAll('colgroup col');
+
+      let restoreMap = null;
+
+      function thWidthPx(key){
+        const th = table.querySelector(`thead th[data-col="${CSS.escape(key)}"]`);
+        const w = parseFloat(getComputedStyle(th).width);
+        return Number.isFinite(w) ? w : th.offsetWidth;
+      }
+      function colKeys(){
+        return Array.from(cols).map(c => c.dataset.col).filter(Boolean);
+      }
+      function applyPercentWidths(){
+        const keys = colKeys();
+        restoreMap = {};
+        cols.forEach(c => restoreMap[c.dataset.col] = c.style.width || '');
+
+        const px = keys.map(k => Math.max(1, Math.round(thWidthPx(k))));
+        const total = px.reduce((a,b)=>a+b,0) || 1;
+        const pct = px.map(v => (v/total)*100);
+        const scale = 100 / pct.reduce((a,b)=>a+b,0);
+        const pctNorm = pct.map(v => v*scale);
+
+        keys.forEach((k, i) => {
+          const c = table.querySelector(`col[data-col="${CSS.escape(k)}"]`);
+          if (c) c.style.width = pctNorm[i].toFixed(3) + '%';
+        });
+      }
+      function restoreWidths(){
+        if (!restoreMap) return;
+        Object.entries(restoreMap).forEach(([k, val])=>{
+          const c = table.querySelector(`col[data-col="${CSS.escape(k)}"]`);
+          if (c) c.style.width = val;
+        });
+        restoreMap = null;
+      }
+
+      window.addEventListener('beforeprint', applyPercentWidths);
+      window.addEventListener('afterprint', restoreWidths);
+      if (window.matchMedia){
+        const mm = window.matchMedia('print');
+        mm.addEventListener?.('change', (e)=>{ if (!e.matches) restoreWidths(); });
+      }
+    })();
+
+    /* Reactivity re-run */
+    function applyFiltersAndSync(){ applyFilters(); afterRenderUiSync(); }
+    deviceSearch.addEventListener('input', applyFiltersAndSync);
+    searchInput.addEventListener('input', applyFiltersAndSync);
+    includeDeviceInMeta.addEventListener('change', applyFiltersAndSync);
+  </script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
+  });
+}
+</script></body>
+</html>
