@@ -407,8 +407,11 @@
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
 }
 
-    function highlightText(text, query){ if (!query) return text; const r=new RegExp(`(${escReg(query)})`,'gi'); return text.replace(r,'<mark>$1</mark>'); }
-    function clearHighlights(root){ root.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)); }
+    function clearHighlights(root){
+  root.querySelectorAll('mark').forEach(m => 
+    m.replaceWith(document.createTextNode(m.textContent))
+  );
+}
 
     /* Snapshot hash (notes per file) */
     function djb2(str){let h=5381;for(let i=0;i<str.length;i++){h=((h<<5)+h)+str.charCodeAt(i);}return (h>>>0).toString(36);}
